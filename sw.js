@@ -1,6 +1,6 @@
 // 体調管理 オフライン対応（ネット優先・失敗したらキャッシュ）。更新のたびに番号を上げる
 const PREFIX = 'taicho-';
-const CACHE = PREFIX + 'v6';
+const CACHE = PREFIX + 'v7';
 // 必須：1 つでも取れなければ更新しない（install を失敗させて、正常な旧キャッシュを残す）
 const REQUIRED = [
   './', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-180.png', './icon.svg',
