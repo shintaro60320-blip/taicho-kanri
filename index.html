@@ -86,6 +86,13 @@ h2 { font-size: 18px; font-weight: 700; line-height: 1.4; }
 .backtoday { display: block; width: 100%; margin: -8px 0 16px; background: var(--surface); color: var(--main); border-color: var(--main); font-weight: 700; }
 
 /* ==== 5 段階の丸 ==== */
+/* ==== アプリとして入れる案内（ホーム画面に追加） ==== */
+.install { background: var(--main-pale); border: 1px solid var(--line); border-radius: var(--r-card, 12px); padding: 12px 16px; margin: 0 0 12px; display: flex; flex-direction: column; gap: 8px; }
+.install p { margin: 0; font-size: 16px; line-height: 1.6; }
+.install .steps { font-size: 16px; line-height: 1.7; color: var(--ink); }
+.install .btnrow { display: flex; gap: 8px; }
+.install .btnrow button { flex: 1; min-height: 44px; white-space: nowrap; padding: 8px 10px; }
+.install .btnrow .primary { flex: 2; background: var(--main); color: #fff; border-color: var(--main); font-weight: 700; }
 .scale-label { font-size: 16px; font-weight: 700; margin: 4px 0 8px; }
 .scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 12px; }
 .scale button { border: none; background: transparent; padding: 4px 0; min-height: 76px; display: flex; flex-direction: column; align-items: center; gap: 4px; border-radius: 10px; }
@@ -1160,6 +1167,31 @@ function scaleHtml(act, labels, current) {
   return h + '</div>';
 }
 
+// ==== アプリとして入れる案内（Android は追加ボタン・iPhone は手順）====
+var installEvt = null;
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvt = e; try { render(); } catch (err) {} });
+window.addEventListener('appinstalled', function () { installEvt = null; toast('ホーム画面に追加しました'); try { render(); } catch (err) {} });
+function isStandalone() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+function isIOS() { return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function installHidden() { try { return localStorage.getItem('taicho_a2hs_hide') === '1'; } catch (e) { return false; } }
+function installHtml(compact) {
+  if (isStandalone()) return compact ? '' : '<div class="card"><h2>アプリとして使う</h2><p class="muted-line">ホーム画面から起動しています。この形で使えます</p></div>';
+  var body;
+  if (installEvt) {
+    body = '<p>ホーム画面に追加すると、アプリとして使えます</p>' +
+      '<div class="btnrow"><button class="primary" data-act="install">アプリとして追加</button>' + (compact ? '<button data-act="installHide">あとで</button>' : '') + '</div>';
+  } else if (isIOS()) {
+    body = '<p>ホーム画面に追加すると、アプリとして使えます</p>' +
+      '<div class="steps">1. 画面下の「共有」ボタン（四角から矢印が出た印）を押す<br>2. 「ホーム画面に追加」を選ぶ<br>3. 右上の「追加」を押す</div>' +
+      (compact ? '<div class="btnrow"><button data-act="installHide">わかりました</button></div>' : '');
+  } else {
+    body = '<p>ホーム画面に追加すると、アプリとして使えます</p>' +
+      '<div class="steps">ブラウザのメニュー（右上の「︙」）から「ホーム画面に追加」または「アプリをインストール」を選ぶ</div>' +
+      (compact ? '<div class="btnrow"><button data-act="installHide">わかりました</button></div>' : '');
+  }
+  return compact ? '<div class="install" role="note">' + body + '</div>' : '<div class="card"><h2>アプリとして使う</h2><div class="install" style="margin:0">' + body + '</div></div>';
+}
+
 function renderToday() {
   var k = ui.view, t = today();
   var day = getDay(k) || C.emptyDay();
@@ -1168,6 +1200,7 @@ function renderToday() {
 
   var missed = isToday ? missedToday() : 0;
   if (missed > 0) h += '<div class="alert">飲み忘れがあります（' + missed + '件）</div>';
+  if (isToday && !installHidden()) h += installHtml(true);
 
   // 日付の帯
   h += '<div class="dateband' + (isToday ? '' : ' other') + '">' +
@@ -1564,7 +1597,8 @@ function periodText(m) {
 function renderSet() {
   var s = data.settings;
   var meds = activeMeds(), arch = data.meds.filter(function (m) { return m.archived; });
-  var h = '<div class="card"><h2>くすり</h2><div class="honest">' + HONEST + '</div>';
+  var h = installHtml(false);
+  h += '<div class="card"><h2>くすり</h2><div class="honest">' + HONEST + '</div>';
   if (!meds.length) h += '<p class="muted-line">まだ登録がありません</p>';
   meds.forEach(function (m) {
     h += '<div class="medcard"><div class="mname"><span class="mdot" style="background:' + colorVar(m.color) + '"></span>' + esc(m.name) + '</div>' +
@@ -1826,6 +1860,8 @@ function requestNotify() {
 
 // ==== 操作（data-act で振り分け） ====
 var ACT = {
+  install: function () { if (!installEvt) return; var ev = installEvt; installEvt = null; ev.prompt(); if (ev.userChoice) ev.userChoice.then(function () { render(); }, function () { render(); }); },
+  installHide: function () { try { localStorage.setItem('taicho_a2hs_hide', '1'); } catch (e) {} render(); },
   tab: function (el) { ui.tab = el.dataset.tab; if (ui.tab === 'cal' && ui.calMonth == null) ui.calMonth = today().slice(0, 7); render(); window.scrollTo(0, 0); },
   close: closeSheet,
   prevDay: function () { ui.view = C.addDays(ui.view, -1); renderToday(); },
